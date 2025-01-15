@@ -35,7 +35,7 @@ Instructions for how to contribute to the project:
 4. Submit a pull request
 
 ## License
-This project is licensed under [LICENSE] - see the LICENSE file for details.
+This project is licensed under [MIT License] - see the LICENSE file for details.
 
 ## Contact
 Jirui Fu Ph.D. - [jirui.fu@ucf.edu]
