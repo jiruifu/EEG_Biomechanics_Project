@@ -46,7 +46,7 @@ class CNN_VO2_1D(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(numNodes[4], 1),
-            nn.ReLU()
+            # nn.ReLU()
         )
 
 

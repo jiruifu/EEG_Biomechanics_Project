@@ -10,11 +10,11 @@ from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 
 shuffle_flag = True
-batch_size = 16
-eeg_path = r"C:\Users\Jerry Fu\Documents\eeg_dataset\Pilot4_data\EEG\Pilot4Oct_OG_A.bdf"
-vo2_path = r"C:\Users\Jerry Fu\Documents\eeg_dataset\Pilot4_data\Metabolics\pilot4Oct_OG_A.xlsx"
-window_size = 512
-window_stride = 256
+batch_size = 32
+eeg_path = r"C:\Users\jirui\Documents\eeg_dataset\Pilot4_data\EEG\Pilot4Oct_OG_A.bdf"
+vo2_path = r"C:\Users\jirui\Documents\eeg_dataset\Pilot4_data\Metabolics\pilot4Oct_OG_A.xlsx"
+window_size = 64
+window_stride = 16
 interpolation_method = "two"
 train_test_split_ratio = 0.05
 train_val_split_ratio = 0.2
@@ -62,9 +62,9 @@ if step1:
     print(f"The shape of the test loader is {len(test_loader)}")
 
     if step2:
-        model = CNN_VO2_1D(num_eeg_channels, window_size, numNodes=[32, 32, 32, 32, 256])
+        model = CNN_VO2_1D(num_eeg_channels, window_size, numNodes=[128, 128, 128, 64, 256])
         learning_rate = 0.0001
-        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         criterion = torch.nn.MSELoss()
         num_epochs = 300
 
