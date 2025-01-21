@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import MaxPool1d
 
 class CNN_VO2_1D(nn.Module):
-    def __init__(self, numChannels, numNodes=[128, 128, 128, 64, 256]):
+    def __init__(self, numChannels, window_size, numNodes=[128, 128, 128, 64, 256]):
         """
         :param numChannels:
         :param classes:
@@ -33,26 +33,29 @@ class CNN_VO2_1D(nn.Module):
         self.cnnBlock2 = nn.Sequential(conv3, relu3, conv4, relu4, maxpool4, dropout4)
 
         # Calculate the size of the flattened feature map
-        self._to_linear = None
-        self.convs(torch.randn(1, numChannels, 512))
+        with torch.no_grad():
+            x_t = torch.zeros(1, numChannels, window_size)
+            x1_t = self.cnnBlock1(x_t)
+            x2_t = self.cnnBlock2(x1_t)
+            flat_size = torch.flatten(x2_t, start_dim=1).shape[1]
 
         # Regression output
         self.regressor = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(self._to_linear, numNodes[4]),
+            nn.Linear(flat_size, numNodes[4]),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(numNodes[4], 1)
+            nn.Linear(numNodes[4], 1),
+            nn.ReLU()
         )
 
-    def convs(self, x):
-        x = self.cnnBlock1(x)
-        x = self.cnnBlock2(x)
-        if self._to_linear is None:
-            self._to_linear = x.shape[1] * x.shape[2]
-        return x
 
     def forward(self, x):
-        x = self.convs(x)
+        x = self.cnnBlock1(x)
+        x = self.cnnBlock2(x)
         x = self.regressor(x)
         return x
+
+if __name__ == "__main__":
+    model = CNN_VO2_1D(numChannels=144, numNodes=[128, 128, 128, 64, 256])
+    print(model)
