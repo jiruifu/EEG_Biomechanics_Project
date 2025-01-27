@@ -3,6 +3,7 @@ import mne
 import numpy as np
 import logging
 import traceback
+from scipy import signal
 
 
 def extract_vo2_data(file_path, start_row=147, time_col='J', vo2_col='K', logger:logging.Logger=None):
@@ -33,46 +34,82 @@ def extract_vo2_data(file_path, start_row=147, time_col='J', vo2_col='K', logger
             print(f"Error extracting VO2 data: {e}")
             print(traceback.format_exc())
 
-def read_bdf_file(file_path, trim_flag:bool=False, new_time_duration:float=293, logger:logging.Logger=None):
+def extract_mc_data_csv(file_path):
+    def time_to_seconds(time_str):
+        try:
+            minutes, seconds = map(int, time_str.split(":"))
+            return minutes * 60 + seconds
+        except:
+            return None
+    df = pd.read_csv(file_path)
+    df["seconds"] = df["t"].apply(time_to_seconds)
+    df['t'] = df['seconds']
+    df = df.drop('seconds', axis=1)
+    time_duration = df['t'].max()
+    return df, time_duration
+
+
+def read_bdf_file(file_path, trim_flag:bool=False, new_time_duration:float=None):
     """
     Load the EEG data from the bdf file and trim the first t seconds to match the VO2 data (optional)
     """
-    try:
-        raw = mne.io.read_raw_bdf(file_path, preload=True)
-        time_duration = raw.times[-1]
-        fsamp = raw.info['sfreq']
-        raw_numpy = raw.get_data()
-        new_time_duration_default = new_time_duration
-        num_channels = raw_numpy.shape[0]
-        if trim_flag:
-            if logger is not None:
-                logger.info("Trimming the EEG data per request")
-            else:
-                print("Trimming the EEG data per request")
-            samples_to_trim = int(10 * fsamp)
-            trimmed_raw = raw.copy().crop(tmin=raw.times[-1]-new_time_duration_default)
-            if trimmed_raw.times[-1] != new_time_duration_default:
-                new_time_duration_returned = trimmed_raw.times[-1]
-                if logger is not None:
-                    logger.info(f"The new time duration of the EEG data is set to {new_time_duration_returned} because the original time duration {new_time_duration_default} doesn't match.")
-                else:
-                    print(f"The new time duration of the EEG data is set to {new_time_duration_returned} because the original time duration {new_time_duration_default} doesn't match.")
-            else:
-                new_time_duration_returned = new_time_duration_default
-            trimmed_raw_numpy = trimmed_raw.get_data()
+    raw = mne.io.read_raw_bdf(file_path, preload=True)
+    time_duration = raw.times[-1]
+    fsamp = raw.info['sfreq']
+    raw_numpy = raw.get_data()
+    new_time_duration_default = new_time_duration
+    num_channels = raw_numpy.shape[0]
+    if trim_flag:
+        print("Trimming the EEG data per request")
+        samples_to_trim = int(10 * fsamp)
+        trimmed_raw = raw.copy().crop(tmin=raw.times[-1]-new_time_duration_default)
+        if trimmed_raw.times[-1] != new_time_duration_default:
+            new_time_duration_returned = trimmed_raw.times[-1]
+            print(f"The new time duration of the EEG data is set to {new_time_duration_returned} because the original time duration {new_time_duration_default} doesn't match.")
         else:
             new_time_duration_returned = new_time_duration_default
-            trimmed_raw_numpy = np.zeros((raw_numpy.shape[0], int(new_time_duration_default * fsamp)))
-            trimmed_raw = trimmed_raw_numpy
-        
-        return num_channels, fsamp, time_duration, new_time_duration_returned, raw, raw_numpy, trimmed_raw, trimmed_raw_numpy
-    except Exception as e:
-        if logger is not None:
-            logger.error(f"Error reading BDF file: {e}")
-            logger.error(traceback.format_exc())
-        else:
-            print(f"Error reading BDF file: {e}")
-            print(traceback.format_exc())
+        trimmed_raw_numpy = trimmed_raw.get_data()
+    else:
+        new_time_duration_returned = new_time_duration_default
+        trimmed_raw_numpy = np.zeros((raw_numpy.shape[0], int(new_time_duration_default * fsamp)))
+        trimmed_raw = trimmed_raw_numpy
+    
+    return num_channels, fsamp, time_duration, new_time_duration_returned, raw, raw_numpy, trimmed_raw, trimmed_raw_numpy
+
+def downsample_eeg(eeg_data, fsamp, new_fsamp, filter:bool=False):
+    """
+    Downsample the EEG data to the new sampling rate
+
+    Parameters:
+        eeg_data: the EEG data, shape (num_channels, num_samples)
+        fsamp: the original sampling rate
+        new_fsamp: the new sampling rate
+    
+    Returns:
+        downsampled_eeg: the downsampled EEG data, shape (num_channels, num_samples)
+    """
+    n_channels, n_samples = eeg_data.shape
+    downsample_factor = fsamp // new_fsamp
+    if downsample_factor < 1:
+        raise ValueError("The new sampling rate is greater than the original sampling rate")
+    
+    if filter:
+        nyquist = new_fsamp/2
+        filter_order = 5
+        cutoff_freq = nyquist / (fsamp/2)
+        b = signal.firwin(filter_order, cutoff_freq)
+        a = 1
+        n_samples_new = n_samples // downsample_factor
+        downsampled_eeg = np.zeros((n_channels, n_samples_new))
+        for i in range(n_channels):
+            filtered_eeg = signal.lfilter(b, a, eeg_data[i, :], axis=0)
+            downsampled_eeg[i, :] = filtered_eeg[::downsample_factor]
+    else:
+        downsampled_eeg = eeg_data[:, ::fsamp//new_fsamp]
+
+    downsampled_eeg = eeg_data[:, ::fsamp//new_fsamp]
+    return downsampled_eeg
+    
 
 def interpolate_vo2_data(vo2_df:pd.DataFrame=None, target_length:float=None, method:str="two", logger:logging.Logger=None):
     """

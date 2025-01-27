@@ -30,10 +30,29 @@ def sliding_window_mean(eeg_data, vo2_data,  num_eeg_channels, window_size, step
     vo2_windowed = vo2_new_container
 
     return eeg_windowed, vo2_windowed
+
+def segment_eeg_een(eeg_data, eem_data, fsamp):
+    """
+    This function is used to segment the EEG data into windows, each window corresponds to a time step of normalized energy expenditure
+    Args:
+        eeg_data: the EEG data, shape (num_eeg_channels, num_samples)
+        eem_data: the normalized energy expenditure data
+        fsamp: the sampling frequency of the EEG data
+    Returns:
+        eeg_windowed: windowed EEG data
+    """
+    length_eem = len(eem_data)  # The number of windows of normalized energy expenditure
+    num_windows = length_eem
+    window_size = 10 * fsamp
+    num_ch, num_samples = eeg_data.shape
+    new_eeg = np.zeros((num_ch, length_eem, window_size))
+    for i in range(num_windows):
+        start_idx = i * window_size
+        end_idx = start_idx + window_size
+        new_eeg[:, i, :] = eeg_data[:, start_idx:end_idx]
+
+    return new_eeg
     
-
-
-
 
 class EEGVO2Dataset(Dataset):
     """
