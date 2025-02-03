@@ -172,3 +172,7 @@ cython_debug/
 *.bdf
 *.xlsx
 .vscode/settings.json
+/1D_speed_prediction/dataset
+/1D_speed_prediction/Ll01
+/models
+/results
